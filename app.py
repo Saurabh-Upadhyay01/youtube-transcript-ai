@@ -154,6 +154,12 @@ def initialize_session_state():
 
         "indexing_complete": False,
 
+        "transcript_fetch_failed": False,
+
+        "pending_url": None,
+
+        "pending_video_id": None,
+
     }
 
     for key, value in defaults.items():
@@ -663,7 +669,7 @@ def get_langchain_chat_history():
 # 14. INDEX YOUTUBE VIDEO
 # ============================================================
 
-def index_youtube_video(url):
+def index_youtube_video(url, manual_transcript=None):
 
     """
     Complete video indexing workflow.
@@ -718,6 +724,12 @@ def index_youtube_video(url):
 
     st.session_state.indexing_complete = False
 
+    st.session_state.transcript_fetch_failed = False
+
+    st.session_state.pending_url = None
+
+    st.session_state.pending_video_id = None
+
     try:
 
         # ----------------------------------------------------
@@ -736,15 +748,46 @@ def index_youtube_video(url):
         # STEP 2: FETCH TRANSCRIPT
         # ----------------------------------------------------
 
-        with st.spinner("Downloading video transcript..."):
+        if manual_transcript is not None:
+            transcript = manual_transcript.strip()
 
-            transcript, metadata = fetch_transcript(
-                video_id
-            )
+            if not transcript:
+                raise ValueError(
+                    "The transcript is empty. Please paste the video transcript."
+                )
 
-        st.success(
-            "Transcript downloaded successfully!"
-        )
+            metadata = {
+                "language": "User provided",
+                "language_code": "manual",
+                "is_generated": False,
+                "video_id": video_id
+            }
+
+            st.success("Manual transcript received successfully!")
+
+        else:
+            try:
+                with st.spinner("Downloading video transcript..."):
+                    transcript, metadata = fetch_transcript(video_id)
+
+                st.success(
+                    "Transcript downloaded successfully!"
+                )
+
+            except Exception as transcript_error:
+                st.session_state.transcript_fetch_failed = True
+                st.session_state.pending_url = normalized_url
+                st.session_state.pending_video_id = video_id
+
+                st.warning(
+                    "Automatic transcript extraction failed. "
+                    "You can still use VidQuery AI by pasting the transcript below."
+                )
+                st.caption(
+                    "Open the YouTube video, select **Show transcript** "
+                    "from its description/menu, copy the transcript, and paste it below."
+                )
+                return False
 
         # ----------------------------------------------------
         # STEP 3: SPLIT TRANSCRIPT
@@ -819,6 +862,12 @@ def index_youtube_video(url):
         st.session_state.video_metadata = metadata
 
         st.session_state.indexing_complete = True
+
+        st.session_state.transcript_fetch_failed = False
+
+        st.session_state.pending_url = None
+
+        st.session_state.pending_video_id = None
 
         return True
 
@@ -1075,6 +1124,49 @@ if index_button:
         except ValueError as error:
 
             st.error(str(error))
+
+
+# ============================================================
+# 19A. MANUAL TRANSCRIPT FALLBACK
+# ============================================================
+
+if st.session_state.transcript_fetch_failed:
+
+    st.markdown("---")
+
+    st.markdown("### 📝 Paste Video Transcript")
+
+    st.info(
+        "YouTube may block transcript requests from hosted servers. "
+        "Paste the transcript here to continue without changing the RAG pipeline."
+    )
+
+    with st.form("manual_transcript_form"):
+
+        manual_transcript = st.text_area(
+            "Video transcript",
+            height=250,
+            placeholder="Paste the copied YouTube transcript here...",
+            help="Copy the transcript from YouTube's Show transcript option."
+        )
+
+        process_manual_button = st.form_submit_button(
+            "⚙️ Process Transcript",
+            use_container_width=True
+        )
+
+    if process_manual_button:
+
+        if not manual_transcript.strip():
+
+            st.warning("Please paste the transcript before processing.")
+
+        else:
+
+            index_youtube_video(
+                st.session_state.pending_url,
+                manual_transcript=manual_transcript
+            )
 
 
 # ============================================================
