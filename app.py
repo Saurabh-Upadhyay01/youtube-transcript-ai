@@ -160,8 +160,6 @@ def initialize_session_state():
 
         "pending_video_id": None,
 
-        "transcript_chunks": 0,
-
     }
 
     for key, value in defaults.items():
@@ -726,8 +724,6 @@ def index_youtube_video(url, manual_transcript=None):
 
     st.session_state.indexing_complete = False
 
-    st.session_state.transcript_chunks = 0
-
     st.session_state.transcript_fetch_failed = False
 
     st.session_state.pending_url = None
@@ -810,8 +806,6 @@ def index_youtube_video(url, manual_transcript=None):
         st.success(
             f"Transcript split into {len(chunks)} chunks!"
         )
-
-        st.session_state.transcript_chunks = len(chunks)
 
         # ----------------------------------------------------
         # STEP 4: LOAD EMBEDDINGS
@@ -1029,7 +1023,7 @@ with st.sidebar:
 
         2. Click Index Video.
 
-        3. View or download the transcript.
+        3. Wait for transcript processing.
 
         4. Ask questions about the video.
 
@@ -1189,7 +1183,7 @@ if st.session_state.indexing_complete:
 
     metadata = st.session_state.video_metadata
 
-    col1, col2 = st.columns([1.15, 0.85], gap="large")
+    col1, col2 = st.columns(2)
 
     with col1:
 
@@ -1199,71 +1193,36 @@ if st.session_state.indexing_complete:
 
     with col2:
 
-        transcript_text = st.session_state.transcript
-        transcript_words = len(transcript_text.split())
-        transcript_type = (
-            "Auto-generated" if metadata["is_generated"]
-            else "Manual / User provided"
-        )
-
-        st.markdown("#### 📊 Video & Indexing Details")
-
-        metric1, metric2 = st.columns(2)
-
-        with metric1:
-            st.metric("Transcript words", f"{transcript_words:,}")
-
-        with metric2:
-            st.metric("Text chunks", f"{st.session_state.transcript_chunks:,}")
-
-        metric3, metric4 = st.columns(2)
-
-        with metric3:
-            st.metric("Characters", f"{len(transcript_text):,}")
-
-        with metric4:
-            st.metric("Language", metadata["language"])
-
         st.markdown(
+
             f"""
             <div class="info-box">
-                <p><b>Video ID:</b> {video_id}</p>
-                <p><b>Language code:</b> {metadata['language_code']}</p>
-                <p><b>Transcript source:</b> {transcript_type}</p>
-                <p><b>Vector database:</b> FAISS (in-memory)</p>
-                <p><b>Retrieval:</b> Top {RETRIEVAL_K} relevant chunks</p>
+
+            <h4>Video Information</h4>
+
+            <p><b>Video ID:</b> {video_id}</p>
+
+            <p><b>Language:</b> {metadata['language']}</p>
+
+            <p><b>Language Code:</b> {metadata['language_code']}</p>
+
+            <p><b>Transcript Type:</b>
+            {"Auto-generated" if metadata['is_generated'] else "Manual"}
+            </p>
+
+            <p><b>Transcript Characters:</b>
+            {len(st.session_state.transcript):,}
+            </p>
+
             </div>
             """,
+
             unsafe_allow_html=True
-        )
 
-    # Full transcript viewer: keeps the page compact while making
-    # the complete source text available whenever the user needs it.
-    with st.expander("📄 View Full Video Transcript", expanded=False):
-
-        st.caption(
-            "This is the transcript used by VidQuery AI to retrieve context and answer your questions."
-        )
-
-        st.text_area(
-            "Full transcript",
-            value=st.session_state.transcript,
-            height=320,
-            disabled=True,
-            label_visibility="collapsed",
-            key=f"transcript_viewer_{video_id}"
-        )
-
-        st.download_button(
-            label="⬇️ Download Transcript (.txt)",
-            data=st.session_state.transcript,
-            file_name=f"youtube_transcript_{video_id}.txt",
-            mime="text/plain",
-            use_container_width=False
         )
 
     st.success(
-        "Your video is ready! You can view or download its transcript and start asking questions below."
+        "Your video is ready! Start asking questions below."
     )
 
 
@@ -1386,4 +1345,4 @@ st.markdown(
 
     unsafe_allow_html=True
 
-)
+)   
